@@ -1,4 +1,4 @@
-name: Build and Deploy Project
+name: Ultimate Android APK Builder
 
 on:
   push:
@@ -19,13 +19,17 @@ jobs:
           node-version: '20'
 
       - name: Install Dependencies
-        run: npm install --force
+        run: |
+          npm install --force
+          npm install @capacitor/core @capacitor/cli @capacitor/android --force
 
       - name: Build Web Project
         run: |
-          npm run build -- --skipLibCheck || npx vite build --emptyOutDir || echo "Build finish"
-          mkdir -p www
-          cp -r dist/* www/ 2>/dev/null || cp -r build/* www/ 2>/dev/null || echo "Web assets ready"
+          npm run build -- --skipLibCheck || npx vite build --emptyOutDir || echo "Web build finished"
+          # Create build directory safely if missing
+          mkdir -p dist
+          if [ ! -f dist/index.html ] && [ -d www ]; then cp -r www/* dist/; fi
+          if [ ! -f dist/index.html ] && [ -d build ]; then cp -r build/* dist/; fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -33,29 +37,21 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Find and Build Android Project
+      - name: Create and Sync Android Platform
         run: |
-          ANDROID_DIR=$(find . -name "gradlew" -exec dirname {} \; | head -n 1)
-          if [ -z "$ANDROID_DIR" ]; then
-            echo "Looking for any android folder..."
-            ANDROID_DIR=$(find . -name "build.gradle" -exec dirname {} \; | head -n 1)
-          fi
-          
-          if [ -not -z "$ANDROID_DIR" ]; then
-            echo "Android project found at: $ANDROID_DIR"
-            cd $ANDROID_DIR
-            chmod +x gradlew 2>/dev/null || true
-            ./gradlew assembleDebug
-          else
-            echo "No Android project root found, creating generic build."
-            npx cap sync || echo "Capacitor sync skipped"
-          fi
+          npx cap init "Bayaan App" "com.bayaan360.app" --web-dir=dist --force || true
+          rm -rf android
+          npx cap add android
+          npx cap sync
 
-      - name: Upload Build Artifacts
+      - name: Build Android Debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: project-output-files
-          path: |
-            **/build/outputs/apk/debug/*.apk
-            www
-            dist
+          name: Bayaan-Attendance-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
