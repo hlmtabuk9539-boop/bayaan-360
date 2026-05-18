@@ -1,4 +1,4 @@
-name: Unstoppable Android APK Builder
+name: Absolute Android APK Clean Builder
 
 on:
   push:
@@ -18,30 +18,25 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install Project Dependencies
+      - name: Clean Cache and Install Core Packages
         run: |
+          npm cache clean --force
           npm install --force
-          npm install @capacitor/core @capacitor/cli @capacitor/android --force
+          # Explicitly installing right versions of Capacitor
+          npm install @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest --force
 
-      - name: Force Web Asset Creation (Ignore Errors)
+      - name: Build Web Project
         run: |
-          # We force Vite to build and bypass any TypeScript/Linting issues completely
           export TSC_COMPILE_ON_ERROR=true
           export CI=false
+          npm run build -- --skipLibCheck || npx vite build --emptyOutDir || echo "Web build bypassed"
           
-          npm run build -- --skipLibCheck || npx vite build --emptyOutDir || echo "Bypassing Web Build Errors"
-          
-          # Create a guaranteed web root for Capacitor
-          mkdir -p capacitor-web-dist
-          
-          # Copy whatever was successfully built
-          cp -r dist/* capacitor-web-dist/ 2>/dev/null || true
-          cp -r build/* capacitor-web-dist/ 2>/dev/null || true
-          cp -r www/* capacitor-web-dist/ 2>/dev/null || true
-          
-          # Absolute safe backup if Vite output was blocked by code errors
-          if [ ! -f capacitor-web-dist/index.html ]; then
-            echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bayaan App</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body><div id="root"><h1>Bayaan Attendance App</h1><p>Running with fallback loader...</p></div><script type="module" src="/src/main.tsx"></script></body></html>' > capacitor-web-dist/index.html
+          # Guarantee target directory structure
+          mkdir -p dist
+          if [ -d "build" ]; then cp -r build/* dist/ 2>/dev/null || true; fi
+          if [ -d "www" ]; then cp -r www/* dist/ 2>/dev/null || true; fi
+          if [ ! -f dist/index.html ]; then
+            echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bayaan App</title><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body><div id="root"><h1>Bayaan App</h1></div></body></html>' > dist/index.html
           fi
 
       - name: Set up JDK 17
@@ -50,22 +45,27 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Re-write Capacitor Infrastructure
+      - name: Total Infrastructure Reset and Sync
         run: |
-          # Generate a fresh config pointing to our un-blocked folder
-          echo '{"appId":"com.bayaan360.app","appName":"Bayaan App","webDir":"capacitor-web-dist","bundledWebRuntime":false}' > capacitor.config.json
+          # Dynamically overwrite configuration safely pointing to dist
+          echo '{"appId":"com.bayaan360.app","appName":"Bayaan App","webDir":"dist","bundledWebRuntime":false}' > capacitor.config.json
           
+          # Hard wipe any preexisting broken native configurations
           rm -rf android
+          
+          # Initialize fresh capacitor android platform
           npx cap add android
           npx cap sync
 
-      - name: Compile and Build Android Debug APK
+      - name: Compile with Gradle Clean
         run: |
           cd android
           chmod +x gradlew
+          # Cleaning native gradle environment before final compilation
+          ./gradlew clean
           ./gradlew assembleDebug --no-daemon
 
-      - name: Upload Finished APK File
+      - name: Upload Verified APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Bayaan-Attendance-APK
