@@ -33,14 +33,8 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Gradle Wrapper if missing
-        run: |
-          cd android
-          if [ ! -f gradlew ]; then
-            echo "gradlew missing! Generating new wrapper..."
-            gradle wrapper --gradle-version 8.2
-          fi
-          chmod +x gradlew
+      - name: Change wrapper permissions
+        run: chmod +x android/gradlew
 
       - name: Build Android Debug APK
         run: |
@@ -50,5 +44,6 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
+          with:
           name: app-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
