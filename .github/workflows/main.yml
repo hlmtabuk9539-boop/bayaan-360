@@ -9,7 +9,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # 
+    # ⚠️ ശ്രദ്ധിക്കുക: നിങ്ങളുടെ package.json കിടക്കുന്ന ഫോൾഡറിന്റെ പേര് (ഉദാഹരണത്തിന് 'AI') 
+    # താഴെയുള്ള 'YOUR_SUBFOLDER_NAME' എന്നതിന് പകരം കൃത്യമായി എഴുതുക.
     defaults:
       run:
         working-directory: AI
